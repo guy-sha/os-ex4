@@ -1,0 +1,22 @@
+p1 is nullptr
+num_free_blocks = 0
+num_free_bytes = 0
+num_allocated_blocks = 1
+num_allocated_bytes = 100
+num_beta_bytes = 32
+size_meta_data = 32
+
+num_free_blocks = 0
+num_free_bytes = 0
+num_allocated_blocks = 3
+num_allocated_bytes = 450
+num_beta_bytes = 96
+size_meta_data = 32
+
+num_free_blocks = 3
+num_free_bytes = 450
+num_allocated_blocks = 3
+num_allocated_bytes = 450
+num_beta_bytes = 96
+size_meta_data = 32
+

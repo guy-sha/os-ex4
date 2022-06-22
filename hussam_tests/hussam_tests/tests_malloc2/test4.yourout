@@ -1,0 +1,56 @@
+num_free_blocks = 0
+num_free_bytes = 0
+num_allocated_blocks = 1
+num_allocated_bytes = 10
+num_beta_bytes = 32
+size_meta_data = 32
+
+num_free_blocks = 0
+num_free_bytes = 0
+num_allocated_blocks = 2
+num_allocated_bytes = 30
+num_beta_bytes = 64
+size_meta_data = 32
+
+num_free_blocks = 0
+num_free_bytes = 0
+num_allocated_blocks = 3
+num_allocated_bytes = 60
+num_beta_bytes = 96
+size_meta_data = 32
+
+num_free_blocks = 0
+num_free_bytes = 0
+num_allocated_blocks = 4
+num_allocated_bytes = 100
+num_beta_bytes = 128
+size_meta_data = 32
+
+num_free_blocks = 1
+num_free_bytes = 40
+num_allocated_blocks = 4
+num_allocated_bytes = 100
+num_beta_bytes = 128
+size_meta_data = 32
+
+num_free_blocks = 1
+num_free_bytes = 40
+num_allocated_blocks = 4
+num_allocated_bytes = 100
+num_beta_bytes = 128
+size_meta_data = 32
+
+num_free_blocks = 1
+num_free_bytes = 40
+num_allocated_blocks = 4
+num_allocated_bytes = 100
+num_beta_bytes = 128
+size_meta_data = 32
+
+num_free_blocks = 1
+num_free_bytes = 40
+num_allocated_blocks = 5
+num_allocated_bytes = 160
+num_beta_bytes = 160
+size_meta_data = 32
+
