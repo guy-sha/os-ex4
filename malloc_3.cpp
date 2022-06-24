@@ -206,12 +206,20 @@ void sfree(void* p) {
     if (p == NULL) {
         return;
     }
-
     MallocMetadata* metadata_ptr = DATA_TO_META_PTR(p);
-    if (metadata_ptr->is_free == false) {
-        metadata_ptr->is_free = true;
-        global_ptr->free_bytes += metadata_ptr->block_size;
-        global_ptr->free_blocks += 1;
+
+    if (metadata_ptr->status == OCCUPIED) {
+        if(metadata_ptr->is_mmapped == true)
+        {
+            updateMetaData(metadata_ptr, FREE, metadata_ptr->block_size, true);
+            removeFromMmapList(metadata_ptr);
+            int res = munmap(metadata_ptr, metadata_ptr->block_size + sizeof(MallocMetadata));
+            /*as long as metadata_ptr was mmapped it should not fail*/
+            assert(res != -1);
+        }
+        else{
+            freeAndMergeAdjacent(metadata_ptr); 
+        }
     }
 }
 
