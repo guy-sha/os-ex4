@@ -1,10 +1,17 @@
 #include <unistd.h>
 #include <cstring>
+#include <sys/mman.h>
+#include <cassert>
+#include <exception>
 
 #define META_TO_DATA_PTR(block_ptr) ((void*)((MallocMetadata*)block_ptr+1))
 #define DATA_TO_META_PTR(data_ptr) ((MallocMetadata*)data_ptr-1)
 #define MMAP_THRESHOLD (0x20000)
+#define IS_MMAP (true)
+#define NOT_MMAP (false)
 
+
+class OutOfMemory : public std::exception {};
 typedef enum { FREE , OCCUPIED , NEW} block_status;
 
 
