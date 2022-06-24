@@ -12,8 +12,9 @@
 
 
 class OutOfMemory : public std::exception {};
-typedef enum { FREE , OCCUPIED , NEW} block_status;
 
+
+typedef enum { FREE , OCCUPIED , NEW} block_status;
 
 
 struct MallocMetadata {
@@ -57,6 +58,60 @@ void _set_up_global_ptr() {
         global_ptr->allocated_bytes = 0;
     }
 }
+
+/*------------------helper functions--------------*/
+
+void updateMetaData(MallocMetadata* meta, block_status stat, size_t diff, bool is_mmap=false)
+{
+
+}
+
+void removeFromSizeFreeList(MallocMetadata* meta)
+{
+    /*just take out, no stats needed */
+}
+
+MallocMetadata* findBestFit(size_t size)
+{
+    /*finds smallest large enough block*/
+}
+
+void insertToMemoryList(MallocMetadata* meta)
+{
+    /*just insert, no stats needed */
+}
+
+void insertToSizeFreeList(MallocMetadata* meta)
+{
+    /*just insert, no stats needed */
+}
+
+MallocMetadata* splitBlock(MallocMetadata* block_to_split)
+{
+    /*remember to update all metadatad and stats*/
+}
+
+void freeAndMergeAdjacent(MallocMetadata* block)
+{
+    /*mark as free, try to merge with neighbors and handle stats*/
+}
+
+MallocMetadata* tryToReuseOrMerge(MallocMetadata* block, size_t size)
+{/*will handle a-f and do split if necessary and handle stats if needed*/
+
+}
+
+void insertToMmapList(MallocMetadata* block)
+{
+    /*just insert, no stats needed */
+}
+
+void removeFromMmapList(MallocMetadata* block)
+{
+    /*just take out, no stats needed */
+}
+
+/*----------------------------------------------------*/
 
 void* smalloc(size_t size) {
 
