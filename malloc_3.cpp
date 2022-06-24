@@ -52,7 +52,10 @@ void _set_up_global_ptr() {
 }
 
 void* smalloc(size_t size) {
-    if (size == 0 || size > (size_t)1e8) {
+
+    size_t aligned_size = (size%8 == 0 ? size : size+(8-size%8) ); 
+
+    if (aligned_size == 0 || aligned_size > (size_t)1e8) {
         return NULL;
     }
 
@@ -63,42 +66,54 @@ void* smalloc(size_t size) {
         }
     }
 
-    MallocMetadata* curr = global_ptr->head;
-    MallocMetadata* prev = NULL;
-    while (curr != NULL) {
-        if (curr->is_free == true && curr->block_size >= size) {
-            curr->is_free = false;
-            global_ptr->free_bytes -= curr->block_size;
-            global_ptr->free_blocks -= 1;
-            return META_TO_DATA_PTR(curr);
+    MallocMetadata* place = findFreeBlockBySize(aligned_size);
+    /*------------------no place in the list-------------------------*/
+    if (place == NULL){ 
+        if(aligned_size + sizeof(MallocMetadata) >= MMAP_THRESHOLD)
+        {
+            /*will use mmap*/
+            return 100000000000000000000000000;
         }
 
-        prev = curr;
-        curr = curr->next;
+        if(global_ptr->tail != NULL && global_ptr->tail->status == FREE)
+        { //wilderness block is free but not big enough, so will enlarge it
+            size_t diff = aligned_size - global_ptr->tail->block_size; 
+            MallocMetadata* curr = (MallocMetadata*)sbrk((intptr_t)(diff));
+            if ((void*)curr == (void*)(-1)) {
+                return NULL;
+            }
+            global_ptr->allocated_bytes += diff;
+            changeFreeStatus(global_ptr->tail, OCCUPIED); //will change status to the given one and update free stats
+            global_ptr->tail->block_size += diff;
+            removeFromSizeFreeList(global_ptr->tail);
+
+            return global_ptr->tail;
+        }
+
+        MallocMetadata* new_block = (MallocMetadata*)sbrk((intptr_t)(aligned_size + sizeof(MallocMetadata)));
+        if ((void*)new_block == (void*)(-1)) {
+            return NULL;
+        }
+
+        new_block->block_size = aligned_size;
+        changeFreeStatus(global_ptr->tail, NEW);
+        new_block->is_mmapped = false;
+
+        insertToMemoryList();
+        insertToSizeList();
+
+        global_ptr->allocated_blocks += 1;
+        global_ptr->allocated_bytes += aligned_size;
+
+        return new_block;
     }
+    /*-------------------------------------------------------------------------------------*/
 
-    curr = (MallocMetadata*)sbrk((intptr_t)(sizeof(MallocMetadata) + size));
-    if ((void*)curr == (void*)(-1)) {
-        return NULL;
-    }
+    /*---------------------found place---------------------------*/
 
-    curr->is_free = false;
-    curr->block_size = size;
-    curr->prev = prev;
-    curr->next = NULL;
 
-    if (prev != NULL) {
-        prev->next = curr;
-    }
+    
 
-    if (global_ptr->head == NULL) {
-        global_ptr->head = curr;
-    }
-
-    global_ptr->allocated_bytes += size;
-    global_ptr->allocated_blocks += 1;
-
-    return META_TO_DATA_PTR(curr);
 }
 
 void* scalloc(size_t num, size_t size) {
