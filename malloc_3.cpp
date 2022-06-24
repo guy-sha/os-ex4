@@ -196,7 +196,7 @@ void* smalloc(size_t size) {
 void* scalloc(size_t num, size_t size) {
     void* ret_ptr = smalloc(num*size);
     if (ret_ptr != NULL) {
-        memset(ret_ptr, 0, num*size);
+        memset(ret_ptr, 0,(DATA_TO_META_PTR(ret_ptr))->block_size);
     }
 
     return ret_ptr;
