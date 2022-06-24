@@ -224,30 +224,71 @@ void sfree(void* p) {
 }
 
 void* srealloc(void* oldp, size_t size) {
-    if (size == 0 || size > (size_t)1e8) {
+
+    size_t aligned_size = (size%8 == 0 ? size : size+(8-size%8) );
+    if (aligned_size == 0 || aligned_size > (size_t)1e8) {
         return NULL;
     }
 
     if (oldp == NULL) {
-        return smalloc(size);
+        return smalloc(aligned_size);
     }
 
     MallocMetadata* old_meta_ptr = DATA_TO_META_PTR(oldp);
-    if (old_meta_ptr->block_size >= size) {
+    if (old_meta_ptr->block_size == aligned_size) {
         return oldp;
-    } else {
-        void* newp = smalloc(size);
-        if (newp == NULL) {
+    } 
+    if (old_meta_ptr->is_mmapped == IS_MMAP)
+    {
+        MallocMetadata* new_region = (MallocMetadata*)mmap(NULL, aligned_size + sizeof(MallocMetadata), 
+                                                                PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+        if( (void*)new_region == (void*)(-1))
+        {
             return NULL;
         }
 
-        void* move_ret = memmove(newp, oldp, size);
-        if (move_ret != newp) {
+        void* move_ret = memmove(META_TO_DATA_PTR(new_region), oldp, old_meta_ptr->block_size);
+        if( move_ret != META_TO_DATA_PTR(new_region))
+        {
+            return NULL;
+        }
+        updateMetaData(new_region, NEW, aligned_size, true);
+        insertToMmapList(new_region);
+        
+        sfree(oldp);
+        return META_TO_DATA_PTR(new_region);
+    }
+    else {
+        MallocMetadata* newp_meta;
+        void* address;
+        bool free_old = false;
+        try{
+            newp_meta = tryToReuseOrMerge(old_meta_ptr,aligned_size);
+        }
+        catch(OutOfMemory& err){
+            return NULL;
+        }
+        if ( newp_meta == NULL)
+        { /*could not reuse any existing blocks*/
+            address = smalloc(aligned_size);
+            if(address == NULL)
+            {
+                return NULL;
+            }
+            free_old = true;
+        }else {
+            address = META_TO_DATA_PTR(newp_meta);
+        }
+        void* move_ret = memmove(address, oldp, DATA_TO_META_PTR(oldp)->block_size);
+        if (move_ret != address) {
             /* TODO: Should we somehow undo the allocation of newp? */
             return NULL;
         }
-        sfree(oldp);
-        return newp;
+        if(free_old == true)
+        {
+            sfree(oldp);
+        }
+        return address;
     }
 }
 
