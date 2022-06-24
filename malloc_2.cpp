@@ -4,7 +4,6 @@
 #define META_TO_DATA_PTR(block_ptr) ((void*)((MallocMetadata*)block_ptr+1))
 #define DATA_TO_META_PTR(data_ptr) ((MallocMetadata*)data_ptr-1)
 
-/* TODO: Should we merge adjacent free blocks? */
 
 struct MallocMetadata {
     size_t block_size;
