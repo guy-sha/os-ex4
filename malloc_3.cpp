@@ -3,18 +3,29 @@
 
 #define META_TO_DATA_PTR(block_ptr) ((void*)((MallocMetadata*)block_ptr+1))
 #define DATA_TO_META_PTR(data_ptr) ((MallocMetadata*)data_ptr-1)
+#define MMAP_THRESHOLD (0x20000)
 
-/* TODO: Should we merge adjacent free blocks? */
+typedef enum { FREE , OCCUPIED , NEW} block_status;
+
+
 
 struct MallocMetadata {
-    size_t block_size;
-    bool is_free;
-    MallocMetadata* next;
-    MallocMetadata* prev;
+    size_t block_size;  /* 8 bytes */
+    block_status status; /* 4 bytes */
+    bool is_mmapped; /* 1 byte */
+    MallocMetadata* next; /* 8 bytes */
+    MallocMetadata* prev; /* 8 bytes */
+    MallocMetadata* free_by_size_next; /* 8 bytes */
+    MallocMetadata* free_by_size_prev; /* 8 bytes */
+    /*TODO: ask is we should enforce our struck to by *8 or can we rely on compilers padding */
 };
 
 struct GlobalMetadata {
-    MallocMetadata* head;
+    MallocMetadata* head; /*head of the memory sorted list*/
+    MallocMetadata* tail; /*the last node of memory list - wilderness*/
+    MallocMetadata* free_by_size_head; /*head of the size sorted list*/
+    MallocMetadata* free_by_size_tail; /*the last node of size sorted list*/
+    MallocMetadata* mmap_head; /*head of the mmapped list*/
     size_t free_blocks;
     size_t free_bytes;
     size_t allocated_blocks;
