@@ -40,6 +40,10 @@ void _set_up_global_ptr() {
     if (sbrk_ptr != (void*)(-1)) {
         global_ptr = (GlobalMetadata*)sbrk_ptr;
         global_ptr->head = NULL;
+        global_ptr->tail = NULL;
+        global_ptr->free_by_size_head = NULL;
+        global_ptr->free_by_size_tail = NULL;
+        global_ptr->mmap_head = NULL;
         global_ptr->free_blocks = 0;
         global_ptr->free_bytes = 0;
         global_ptr->allocated_blocks = 0;
