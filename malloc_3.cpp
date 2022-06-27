@@ -464,9 +464,7 @@ void* smalloc(size_t size) {
     size_t diff = place->block_size - aligned_size;
     if(diff >= SPLIT_THRESHOLD + sizeof(MallocMetadata))
     {
-        MallocMetadata* other_part = splitBlock(place, aligned_size);
-        removeFromSizeFreeList(place);
-        insertToSizeFreeList(other_part);
+        splitBlock(place, aligned_size);
         return META_TO_DATA_PTR(place);
     }
     else{
