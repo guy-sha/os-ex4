@@ -258,8 +258,8 @@ void freeAndMergeAdjacent(MallocMetadata* block)
 
 MallocMetadata* tryToReuseOrMerge(MallocMetadata* block, size_t size)
 {/*will handle a-f and do split if necessary and handle stats if needed*/
-    size_t next_size = block->next->block_size;
-    size_t prev_size = block->prev->block_size;
+    size_t next_size = block->next != NULL ? block->next->block_size : 0;
+    size_t prev_size = block->prev != NULL ? block->prev->block_size : 0;
     bool prev_free = (block->prev != NULL && block->prev->status == FREE);
     bool next_free = (block->next != NULL && block->next->status == FREE);
 
