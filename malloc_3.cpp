@@ -102,7 +102,7 @@ MallocMetadata* findBestFit(size_t size)
     return curr;
 }
 
-void insertToMemoryList(MallocMetadata* meta)
+void appendToMemoryList(MallocMetadata* meta)
 {
     /*just insert, no stats needed */
     MallocMetadata* curr_tail = global_ptr->tail;
@@ -241,7 +241,7 @@ void* smalloc(size_t size) {
                 return NULL;
             }
             updateMetaData(new_region, NEW, aligned_size, true);
-            insertToMmapList(new_region);
+            prependToMmapList(new_region);
 
             return META_TO_DATA_PTR(new_region);
         }
@@ -266,7 +266,7 @@ void* smalloc(size_t size) {
         }
 
         updateMetaData(new_block, NEW, aligned_size);
-        insertToMemoryList(new_block);
+        appendToMemoryList(new_block);
         insertToSizeFreeList(new_block);
 
         /*global_ptr->allocated_blocks += 1;
@@ -353,7 +353,7 @@ void* srealloc(void* oldp, size_t size) {
             return NULL;
         }
         updateMetaData(new_region, NEW, aligned_size, true);
-        insertToMmapList(new_region);
+        prependToMmapList(new_region);
         
         sfree(oldp);
         return META_TO_DATA_PTR(new_region);
