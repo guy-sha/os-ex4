@@ -6,6 +6,7 @@
 
 #define META_TO_DATA_PTR(block_ptr) ((void*)((MallocMetadata*)block_ptr+1))
 #define DATA_TO_META_PTR(data_ptr) ((MallocMetadata*)data_ptr-1)
+#define SPLIT_THRESHOLD (128)
 #define MMAP_THRESHOLD (0x20000)
 #define IS_MMAP (true)
 #define NOT_MMAP (false)
@@ -182,7 +183,7 @@ void* smalloc(size_t size) {
 
     /*---------------------found place---------------------------*/
     size_t diff = place->block_size - aligned_size;
-    if(diff >= 128 + sizeof(MallocMetadata))
+    if(diff >= SPLIT_THRESHOLD + sizeof(MallocMetadata))
     {
         MallocMetadata* other_part = splitBlock(place);
         removeFromSizeFreeList(place);
