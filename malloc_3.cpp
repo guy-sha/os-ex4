@@ -167,9 +167,11 @@ void insertToSizeFreeList(MallocMetadata* meta)
     curr->free_by_size_prev = meta;
 }
 
-MallocMetadata* splitBlock(MallocMetadata* block_to_split)
+MallocMetadata* splitBlock(MallocMetadata* block_to_split, size_t new_size)
 {
-    /*remember to update all metadatad and stats*/
+    /*remember to update all metadata and stats*/
+    MallocMetadata* other_part = (MallocMetadata*)((char*)(block_to_split) + sizeof(MallocMetadata) + new_size);
+
 }
 
 void freeAndMergeAdjacent(MallocMetadata* block)
