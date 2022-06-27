@@ -176,7 +176,39 @@ void insertToSizeFreeList(MallocMetadata* meta)
     curr->free_by_size_prev = meta;
 }
 
-MallocMetadata* splitBlock(MallocMetadata* block_to_split, size_t new_size)
+void mergeWithUpper(MallocMetadata* block, block_status status) {
+    MallocMetadata* upper = block->next;
+    if (upper->status == FREE) {
+        removeFromSizeFreeList(upper);
+    }
+
+    block->next = upper->next;
+    if (upper->next != NULL) {
+        upper->next->prev = block;
+    } else {
+        global_ptr->tail = block;
+    }
+
+    updateMetaData(block, status, block->block_size + sizeof(MallocMetadata) + upper->block_size);
+}
+
+void mergeWithLower(MallocMetadata* block, block_status status) {
+    MallocMetadata* lower = block->prev;
+    if (lower->status == FREE) {
+        removeFromSizeFreeList(lower);
+    }
+
+    lower->next = block->next;
+    if (block->next != NULL) {
+        block->next->prev = lower;
+    } else {
+        global_ptr->tail = lower;
+    }
+
+    updateMetaData(lower, status, block->block_size + sizeof(MallocMetadata) + lower->block_size);
+}
+
+void splitBlock(MallocMetadata* block_to_split, size_t new_size)
 {
     /*remember to update all metadata and stats*/
     MallocMetadata* other_part = (MallocMetadata*)((char*)(block_to_split) + sizeof(MallocMetadata) + new_size);
