@@ -429,7 +429,7 @@ void* smalloc(size_t size) {
 
         if(global_ptr->tail != NULL && global_ptr->tail->status == FREE)
         { //wilderness block is free but not big enough, so will enlarge it
-            size_t diff = aligned_size - global_ptr->tail->block_size; 
+            long diff = (long)(aligned_size - global_ptr->tail->block_size);
             MallocMetadata* curr = (MallocMetadata*)sbrk((intptr_t)(diff));
             if ((void*)curr == (void*)(-1)) {
                 return NULL;
