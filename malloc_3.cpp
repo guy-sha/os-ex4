@@ -445,10 +445,6 @@ void* smalloc(size_t size) {
         updateMetaData(new_block, OCCUPIED, aligned_size);
         updateStats(0,0,1,aligned_size);
         appendToMemoryList(new_block);
-        insertToSizeFreeList(new_block);
-
-        /*global_ptr->allocated_blocks += 1;
-        global_ptr->allocated_bytes += aligned_size; - inside updateMetadata*/
 
         return META_TO_DATA_PTR(new_block);
     }
