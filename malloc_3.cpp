@@ -521,7 +521,8 @@ void* srealloc(void* oldp, size_t size) {
             return NULL;
         }
 
-        void* move_ret = memmove(META_TO_DATA_PTR(new_region), oldp, old_meta_ptr->block_size);
+        size_t min_copy_size = old_meta_ptr->block_size <= aligned_size ? old_meta_ptr->block_size : aligned_size;
+        void* move_ret = memmove(META_TO_DATA_PTR(new_region), oldp, min_copy_size);
         if( move_ret != META_TO_DATA_PTR(new_region))
         {
             return NULL;
