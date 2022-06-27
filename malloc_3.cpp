@@ -545,7 +545,7 @@ void* srealloc(void* oldp, size_t size) {
     else {
         MallocMetadata* newp_meta;
         void* address;
-        bool free_old = false;
+        bool used_malloc = false;
         try{
             newp_meta = tryToReuseOrMerge(old_meta_ptr,aligned_size);
         }
@@ -559,18 +559,25 @@ void* srealloc(void* oldp, size_t size) {
             {
                 return NULL;
             }
-            free_old = true;
+            used_malloc = true;
         }else {
             address = META_TO_DATA_PTR(newp_meta);
         }
-        void* move_ret = memmove(address, oldp, DATA_TO_META_PTR(oldp)->block_size);
+
+        size_t min_copy_size = old_meta_ptr->block_size <= aligned_size ? old_meta_ptr->block_size : aligned_size;
+        void* move_ret = memmove(address, oldp, min_copy_size);
         if (move_ret != address) {
             /* TODO: Should we somehow undo the allocation of newp? */
             return NULL;
         }
-        if(free_old == true)
+
+        if(used_malloc == true)
         {
             sfree(oldp);
+        } else {
+            if (newp_meta->block_size >= aligned_size + SPLIT_THRESHOLD + sizeof(MallocMetadata)) {
+                splitBlock(newp_meta, aligned_size);
+            }
         }
         return address;
     }
