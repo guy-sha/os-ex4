@@ -73,21 +73,98 @@ void updateMetaData(MallocMetadata* meta, block_status stat, size_t diff, bool i
 void removeFromSizeFreeList(MallocMetadata* meta)
 {
     /*just take out, no stats needed */
+    MallocMetadata* prev = meta->free_by_size_prev, *next = meta->free_by_size_next;
+    if (prev != NULL) {
+        prev->free_by_size_next = next;
+    } else {
+        global_ptr->free_by_size_head = next;
+    }
+
+    if (next != NULL) {
+        next->free_by_size_prev = prev;
+    } else {
+        global_ptr->free_by_size_tail = prev;
+    }
 }
 
 MallocMetadata* findBestFit(size_t size)
 {
     /*finds smallest large enough block*/
+    if (global_ptr->free_by_size_tail == NULL || global_ptr->free_by_size_tail->block_size < size) {
+        return NULL;
+    }
+
+    MallocMetadata* curr = global_ptr->free_by_size_head;
+    while (curr != NULL && size > curr->block_size) {
+        curr = curr->free_by_size_next;
+    }
+
+    return curr;
 }
 
 void insertToMemoryList(MallocMetadata* meta)
 {
     /*just insert, no stats needed */
+    MallocMetadata* curr_tail = global_ptr->tail;
+    if (curr_tail != NULL) {
+        curr_tail->next = meta;
+        meta->prev = curr_tail;
+    } else {
+        meta->prev = NULL;
+        global_ptr->head = meta;
+    }
+
+    meta->next = NULL;
+    global_ptr->tail = meta;
+}
+/* Return true if a < b
+ * Both assumed to be not NULL */
+bool isLowerInFreeList(MallocMetadata* a, MallocMetadata* b) {
+    return ((a->block_size < b->block_size) || ((a->block_size == b->block_size) && (a < b)));
 }
 
 void insertToSizeFreeList(MallocMetadata* meta)
 {
     /*just insert, no stats needed */
+    if (global_ptr->free_by_size_tail == NULL) {
+        global_ptr->free_by_size_head = meta;
+        global_ptr->free_by_size_tail = meta;
+        meta->free_by_size_prev = NULL;
+        meta->free_by_size_next = NULL;
+        return;
+    } else if (isLowerInFreeList(global_ptr->free_by_size_tail, meta)) {
+        global_ptr->free_by_size_tail->free_by_size_next = meta;
+        meta->free_by_size_prev = global_ptr->free_by_size_tail;
+        meta->free_by_size_next = NULL;
+        global_ptr->free_by_size_tail = meta;
+        return;
+    }
+
+    /* If we got here the list should be non-empty
+     * And meta will never be inserted at the tail */
+    assert(global_ptr->free_by_size_head != NULL);
+
+    /* After break meta should be inserted BEFORE curr */
+    MallocMetadata* curr = global_ptr->free_by_size_head;
+    while (curr->free_by_size_next != NULL) {
+        if (isLowerInFreeList(meta, curr)) {
+            break;
+        }
+
+        curr = curr->free_by_size_next;
+    }
+
+
+    meta->free_by_size_prev = curr->free_by_size_prev;
+    meta->free_by_size_next = curr;
+
+    if (curr->free_by_size_prev == NULL) {
+        global_ptr->free_by_size_head = meta;
+    } else {
+        curr->free_by_size_prev->free_by_size_next = meta;
+    }
+
+    curr->free_by_size_prev = meta;
 }
 
 MallocMetadata* splitBlock(MallocMetadata* block_to_split)
@@ -105,14 +182,31 @@ MallocMetadata* tryToReuseOrMerge(MallocMetadata* block, size_t size)
 
 }
 
-void insertToMmapList(MallocMetadata* block)
+void prependToMmapList(MallocMetadata* block)
 {
     /*just insert, no stats needed */
+    block->next = global_ptr->mmap_head;
+    block->prev = NULL;
+    if (global_ptr->mmap_head != NULL) {
+        global_ptr->mmap_head->prev = block;
+    }
+
+    global_ptr->mmap_head = block;
 }
 
-void removeFromMmapList(MallocMetadata* block)
+void removeFromMmapList(MallocMetadata* meta)
 {
     /*just take out, no stats needed */
+    MallocMetadata* prev = meta->prev, *next = meta->next;
+    if (prev != NULL) {
+        prev->next = next;
+    } else {
+        global_ptr->mmap_head = next;
+    }
+
+    if (next != NULL) {
+        next->prev = prev;
+    }
 }
 
 /*----------------------------------------------------*/
