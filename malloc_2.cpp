@@ -21,39 +21,48 @@ struct GlobalMetadata {
 };
 
 /* TODO: is it okay if we make this static? */
-GlobalMetadata* global_ptr = NULL;
+GlobalMetadata global_ptr = {NULL, 0, 0, 0, 0};
+//global_ptr.head = NULL;
+//global_ptr.free_blocks = 0;
+//global_ptr.free_bytes = 0;
+//global_ptr.allocated_blocks = 0;
+//global_ptr.allocated_bytes = 0;
 
-void _set_up_global_ptr() {
+/*
+void alignInitialProgBreak() {
     void* sbrk_ptr = sbrk(sizeof(*global_ptr));
     if (sbrk_ptr != (void*)(-1)) {
         global_ptr = (GlobalMetadata*)sbrk_ptr;
-        global_ptr->head = NULL;
-        global_ptr->free_blocks = 0;
-        global_ptr->free_bytes = 0;
-        global_ptr->allocated_blocks = 0;
-        global_ptr->allocated_bytes = 0;
+        global_ptr.head = NULL;
+        global_ptr.free_blocks = 0;
+        global_ptr.free_bytes = 0;
+        global_ptr.allocated_blocks = 0;
+        global_ptr.allocated_bytes = 0;
     }
 }
+*/
 
 void* smalloc(size_t size) {
     if (size == 0 || size > (size_t)1e8) {
         return NULL;
     }
 
+    /*
     if (global_ptr == NULL) {
-        _set_up_global_ptr();
+        alignInitialProgBreak();
         if (global_ptr == NULL) {
             return NULL;
         }
     }
+     */
 
-    MallocMetadata* curr = global_ptr->head;
+    MallocMetadata* curr = global_ptr.head;
     MallocMetadata* prev = NULL;
     while (curr != NULL) {
         if (curr->is_free == true && curr->block_size >= size) {
             curr->is_free = false;
-            global_ptr->free_bytes -= curr->block_size;
-            global_ptr->free_blocks -= 1;
+            global_ptr.free_bytes -= curr->block_size;
+            global_ptr.free_blocks -= 1;
             return META_TO_DATA_PTR(curr);
         }
 
@@ -75,12 +84,12 @@ void* smalloc(size_t size) {
         prev->next = curr;
     }
 
-    if (global_ptr->head == NULL) {
-        global_ptr->head = curr;
+    if (global_ptr.head == NULL) {
+        global_ptr.head = curr;
     }
 
-    global_ptr->allocated_bytes += size;
-    global_ptr->allocated_blocks += 1;
+    global_ptr.allocated_bytes += size;
+    global_ptr.allocated_blocks += 1;
 
     return META_TO_DATA_PTR(curr);
 }
@@ -102,8 +111,8 @@ void sfree(void* p) {
     MallocMetadata* metadata_ptr = DATA_TO_META_PTR(p);
     if (metadata_ptr->is_free == false) {
         metadata_ptr->is_free = true;
-        global_ptr->free_bytes += metadata_ptr->block_size;
-        global_ptr->free_blocks += 1;
+        global_ptr.free_bytes += metadata_ptr->block_size;
+        global_ptr.free_blocks += 1;
     }
 }
 
@@ -136,23 +145,23 @@ void* srealloc(void* oldp, size_t size) {
 }
 
 size_t _num_free_blocks() {
-    return global_ptr->free_blocks;
+    return global_ptr.free_blocks;
 }
 
 size_t _num_free_bytes() {
-    return global_ptr->free_bytes;
+    return global_ptr.free_bytes;
 }
 
 size_t _num_allocated_blocks() {
-    return global_ptr->allocated_blocks;
+    return global_ptr.allocated_blocks;
 }
 
 size_t _num_allocated_bytes() {
-    return global_ptr->allocated_bytes;
+    return global_ptr.allocated_bytes;
 }
 
 size_t _num_meta_data_bytes() {
-    return (global_ptr->allocated_blocks * sizeof(MallocMetadata));
+    return (global_ptr.allocated_blocks * sizeof(MallocMetadata));
 }
 size_t _size_meta_data() {
     return sizeof(MallocMetadata);
