@@ -252,7 +252,7 @@ void* smalloc(size_t size) {
                 return NULL;
             }
             global_ptr->allocated_bytes += diff;
-            updateMetaData(global_ptr->tail, OCCUPIED, diff); //will change status to the given one and update free stats
+            updateMetaData(global_ptr->tail, OCCUPIED, global_ptr->tail->block_size + diff); //will change status to the given one and update free stats
             removeFromSizeFreeList(global_ptr->tail);
 
             return META_TO_DATA_PTR(global_ptr->tail);
@@ -279,13 +279,13 @@ void* smalloc(size_t size) {
     size_t diff = place->block_size - aligned_size;
     if(diff >= SPLIT_THRESHOLD + sizeof(MallocMetadata))
     {
-        MallocMetadata* other_part = splitBlock(place);
+        MallocMetadata* other_part = splitBlock(place, aligned_size);
         removeFromSizeFreeList(place);
         insertToSizeFreeList(other_part);
         return META_TO_DATA_PTR(place);
     }
     else{
-        updateMetaData(place, OCCUPIED, 0);
+        updateMetaData(place, OCCUPIED, place->block_size);
         removeFromSizeFreeList(place);
         return META_TO_DATA_PTR(place);
     }
