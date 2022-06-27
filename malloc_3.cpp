@@ -265,7 +265,103 @@ void freeAndMergeAdjacent(MallocMetadata* block)
 
 MallocMetadata* tryToReuseOrMerge(MallocMetadata* block, size_t size)
 {/*will handle a-f and do split if necessary and handle stats if needed*/
+    size_t next_size = block->next->block_size;
+    size_t prev_size = block->prev->block_size;
+    bool prev_free = (block->prev != NULL && block->prev->status == FREE);
+    bool next_free = (block->next != NULL && block->next->status == FREE);
 
+    /* a */
+    if (block->block_size >= size) {
+        return block;
+    }
+
+    /* b */
+    if (prev_free) {
+        size_t merged_size = block->block_size + prev_size + sizeof(MallocMetadata);
+        size_t diff = size - merged_size;
+        if (merged_size >= size) {
+            mergeWithLower(block, OCCUPIED);
+            block = block->prev;
+            updateStats(-1, -(prev_size), -1, sizeof(MallocMetadata));
+            return block;
+        } else if (block == global_ptr->tail) {
+            /* current block is wilderness */
+            void* prev_prog_break = sbrk((intptr_t)(diff));
+            if (prev_prog_break == (void*)(-1)) {
+                throw OutOfMemory();
+            }
+            mergeWithLower(block, OCCUPIED);
+            block = block->prev;
+            updateMetaData(block, OCCUPIED, block->block_size + diff);
+            updateStats(-1, -(prev_size), -1, sizeof(MallocMetadata) + diff);
+            return block;
+        }
+    }
+
+    /* c */
+    if (block == global_ptr->tail) {
+        size_t diff = size - block->block_size;
+        void* prev_prog_break = sbrk((intptr_t)(diff));
+        if (prev_prog_break == (void*)(-1)) {
+            throw OutOfMemory();
+        }
+        updateMetaData(block, OCCUPIED, block->block_size + diff);
+        updateStats(0,0,0,diff);
+        return block;
+    }
+
+    /* d */
+    if (next_free && (size <= (block->block_size + next_size + sizeof(MallocMetadata)))) {
+        mergeWithUpper(block, OCCUPIED);
+        updateStats(-1, -(next_size), -1, sizeof(MallocMetadata));
+        return block;
+    }
+
+    /* e */
+    if (prev_free && next_free && (prev_size + next_size + block->block_size + 2* sizeof(MallocMetadata) >= size)) {
+        mergeWithUpper(block, OCCUPIED);
+        mergeWithLower(block, OCCUPIED);
+        block = block->prev;
+        updateStats(-2, -(prev_size + next_size), -2, 2*sizeof(MallocMetadata));
+        return block;
+    }
+
+    /* f */
+    if (next_free && block->next == global_ptr->tail) {
+        if (prev_free) {
+            size_t merged_size = prev_size + next_size + block->block_size + 2 * sizeof(MallocMetadata);
+            size_t diff = size - merged_size;
+
+            void *prev_prog_break = sbrk((intptr_t) (diff));
+            if (prev_prog_break == (void *) (-1)) {
+                throw OutOfMemory();
+            }
+
+            mergeWithUpper(block, OCCUPIED);
+            mergeWithLower(block, OCCUPIED);
+            block = block->prev;
+
+            updateMetaData(block, OCCUPIED, block->block_size + diff);
+            updateStats(-2, -(prev_size + next_size), -2,
+                        2 * sizeof(MallocMetadata) + diff);
+            return block;
+        } else {
+            size_t merged_size = next_size + block->block_size + sizeof(MallocMetadata);
+            size_t diff = size - merged_size;
+
+            void *prev_prog_break = sbrk((intptr_t) (diff));
+            if (prev_prog_break == (void *) (-1)) {
+                throw OutOfMemory();
+            }
+
+            mergeWithUpper(block, OCCUPIED);
+            updateMetaData(block, OCCUPIED, block->block_size + diff);
+            updateStats(-1, -(next_size), -1,sizeof(MallocMetadata) + diff);
+            return block;
+        }
+    }
+
+    return NULL;
 }
 
 void prependToMmapList(MallocMetadata* block)
