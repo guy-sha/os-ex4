@@ -212,7 +212,34 @@ void splitBlock(MallocMetadata* block_to_split, size_t new_size)
 {
     /*remember to update all metadata and stats*/
     MallocMetadata* other_part = (MallocMetadata*)((char*)(block_to_split) + sizeof(MallocMetadata) + new_size);
+    block_status orig_status = block_to_split->status;
+    size_t orig_size = block_to_split->block_size;
 
+    updateMetaData(block_to_split, OCCUPIED, new_size);
+    updateMetaData(other_part, FREE, (orig_size - new_size - sizeof(MallocMetadata)));
+
+    other_part->next = block_to_split->next;
+    other_part->prev = block_to_split;
+    if (block_to_split->next == NULL) {
+        global_ptr->tail = other_part;
+    } else {
+        block_to_split->next->prev = other_part;
+    }
+    block_to_split->next = other_part;
+
+    if (orig_status == FREE) {
+        removeFromSizeFreeList(block_to_split);
+        updateStats(0, -(long)(new_size + sizeof(MallocMetadata)), 1, -((long)sizeof(MallocMetadata)));
+    } else {
+        if (other_part->next != NULL && other_part->next->status == FREE) {
+            mergeWithUpper(other_part, FREE);
+            updateStats(0, orig_size - new_size, 0, 0);
+        } else {
+            updateStats(1, other_part->block_size, 1, -((long)sizeof(MallocMetadata)));
+        }
+    }
+
+    insertToSizeFreeList(other_part);
 }
 
 void freeAndMergeAdjacent(MallocMetadata* block)
