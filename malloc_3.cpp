@@ -4,6 +4,8 @@
 #include <cassert>
 #include <exception>
 
+#include <stdio.h>
+
 #define META_TO_DATA_PTR(block_ptr) ((void*)((MallocMetadata*)block_ptr+1))
 #define DATA_TO_META_PTR(data_ptr) ((MallocMetadata*)data_ptr-1)
 #define SPLIT_THRESHOLD (128)
@@ -511,6 +513,7 @@ void* srealloc(void* oldp, size_t size) {
     }
 
     MallocMetadata* old_meta_ptr = DATA_TO_META_PTR(oldp);
+    printf("old_meta_ptr is ok: %p\n", (void*)old_meta_ptr);
     if (old_meta_ptr->block_size == aligned_size) {
         return oldp;
     } 
@@ -540,7 +543,9 @@ void* srealloc(void* oldp, size_t size) {
         void* address;
         bool used_malloc = false;
         try{
+            printf("starting tryToReuse\n");
             newp_meta = tryToReuseOrMerge(old_meta_ptr,aligned_size);
+            printf("finished tryToReuse, newp_meta=%p\n", (void*)newp_meta);
         }
         catch(OutOfMemory& err){
             return NULL;
@@ -557,8 +562,10 @@ void* srealloc(void* oldp, size_t size) {
             address = META_TO_DATA_PTR(newp_meta);
         }
 
+        printf("going to do memmove\n");
         size_t min_copy_size = old_meta_ptr->block_size <= aligned_size ? old_meta_ptr->block_size : aligned_size;
         void* move_ret = memmove(address, oldp, min_copy_size);
+        printf("memmove done\n");
         if (move_ret != address) {
             /* TODO: Should we somehow undo the allocation of newp? */
             return NULL;
