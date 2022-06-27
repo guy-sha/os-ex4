@@ -245,6 +245,22 @@ void splitBlock(MallocMetadata* block_to_split, size_t new_size)
 void freeAndMergeAdjacent(MallocMetadata* block)
 {
     /*mark as free, try to merge with neighbors and handle stats*/
+    updateMetaData(block, FREE, block->block_size);
+    updateStats(1, block->block_size, 0, 0);
+
+    MallocMetadata* prev = block->prev, *next = block->next;
+    if (next != NULL && next->status == FREE) {
+        mergeWithUpper(block, FREE);
+        updateStats(-1, sizeof(MallocMetadata), -1, sizeof(MallocMetadata));
+    }
+
+    if (prev != NULL && prev->status == FREE) {
+        mergeWithLower(block, FREE);
+        updateStats(-1, sizeof(MallocMetadata), -1, sizeof(MallocMetadata));
+        block = prev;
+    }
+
+    insertToSizeFreeList(block);
 }
 
 MallocMetadata* tryToReuseOrMerge(MallocMetadata* block, size_t size)
