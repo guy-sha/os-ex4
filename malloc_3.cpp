@@ -15,7 +15,7 @@
 class OutOfMemory : public std::exception {};
 
 
-typedef enum { FREE , OCCUPIED , NEW} block_status;
+typedef enum { FREE , OCCUPIED} block_status;
 
 
 struct MallocMetadata {
@@ -65,9 +65,18 @@ void _set_up_global_ptr() {
 
 /*------------------helper functions--------------*/
 
-void updateMetaData(MallocMetadata* meta, block_status stat, size_t diff, bool is_mmap=false)
+void updateMetaData(MallocMetadata* meta, block_status stat, size_t new_size, bool is_mmap=false)
 {
+    meta->status = stat;
+    meta->block_size = new_size;
+    meta->is_mmapped = is_mmap;
+}
 
+void updateStats(long free_blocks, long free_bytes, long allocated_blocks, long allocated_bytes) {
+    global_ptr->free_blocks += free_blocks;
+    global_ptr->free_bytes += free_bytes;
+    global_ptr->allocated_blocks += allocated_blocks;
+    global_ptr->allocated_bytes += allocated_bytes;
 }
 
 void removeFromSizeFreeList(MallocMetadata* meta)
@@ -240,7 +249,8 @@ void* smalloc(size_t size) {
             {
                 return NULL;
             }
-            updateMetaData(new_region, NEW, aligned_size, true);
+            updateMetaData(new_region, OCCUPIED, aligned_size, true);
+            updateStats(0,0,1,aligned_size);
             prependToMmapList(new_region);
 
             return META_TO_DATA_PTR(new_region);
@@ -253,7 +263,8 @@ void* smalloc(size_t size) {
             if ((void*)curr == (void*)(-1)) {
                 return NULL;
             }
-            global_ptr->allocated_bytes += diff;
+
+            updateStats(-1, -(long)(global_ptr->tail->block_size), 0, diff);
             updateMetaData(global_ptr->tail, OCCUPIED, global_ptr->tail->block_size + diff); //will change status to the given one and update free stats
             removeFromSizeFreeList(global_ptr->tail);
 
@@ -265,7 +276,8 @@ void* smalloc(size_t size) {
             return NULL;
         }
 
-        updateMetaData(new_block, NEW, aligned_size);
+        updateMetaData(new_block, OCCUPIED, aligned_size);
+        updateStats(0,0,1,aligned_size);
         appendToMemoryList(new_block);
         insertToSizeFreeList(new_block);
 
@@ -288,6 +300,7 @@ void* smalloc(size_t size) {
     }
     else{
         updateMetaData(place, OCCUPIED, place->block_size);
+        updateStats(-1, -(long)(place->block_size), 0, 0);
         removeFromSizeFreeList(place);
         return META_TO_DATA_PTR(place);
     }
@@ -311,7 +324,8 @@ void sfree(void* p) {
     if (metadata_ptr->status == OCCUPIED) {
         if(metadata_ptr->is_mmapped == true)
         {
-            updateMetaData(metadata_ptr, FREE, metadata_ptr->block_size, true);
+//            updateMetaData(metadata_ptr, FREE, metadata_ptr->block_size, true);
+            updateStats(0,0,-1,-(long)(metadata_ptr->block_size));
             removeFromMmapList(metadata_ptr);
             int res = munmap(metadata_ptr, metadata_ptr->block_size + sizeof(MallocMetadata));
             /*as long as metadata_ptr was mmapped it should not fail*/
@@ -352,7 +366,8 @@ void* srealloc(void* oldp, size_t size) {
         {
             return NULL;
         }
-        updateMetaData(new_region, NEW, aligned_size, true);
+        updateMetaData(new_region, OCCUPIED, aligned_size, true);
+        updateStats(0, 0, 1, aligned_size);
         prependToMmapList(new_region);
         
         sfree(oldp);
