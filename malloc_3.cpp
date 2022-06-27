@@ -44,9 +44,12 @@ struct GlobalMetadata {
 GlobalMetadata* global_ptr = NULL;
 
 void _set_up_global_ptr() {
-    void* sbrk_ptr = sbrk(sizeof(*global_ptr));
+    unsigned long init_sbrk_ptr = (unsigned long)sbrk(0);
+    size_t aligned_size = (init_sbrk_ptr%8 == 0 ? 0 : (8-init_sbrk_ptr%8) );
+
+    void* sbrk_ptr = sbrk(sizeof(*global_ptr)+aligned_size);
     if (sbrk_ptr != (void*)(-1)) {
-        global_ptr = (GlobalMetadata*)sbrk_ptr;
+        global_ptr = (GlobalMetadata*)((char*)sbrk_ptr + aligned_size);
         global_ptr->head = NULL;
         global_ptr->tail = NULL;
         global_ptr->free_by_size_head = NULL;
