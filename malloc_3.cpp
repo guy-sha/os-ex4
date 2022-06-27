@@ -41,26 +41,19 @@ struct GlobalMetadata {
     size_t allocated_bytes;
 };
 
-/* TODO: is it okay if we make this static? */
-GlobalMetadata* global_ptr = NULL;
+GlobalMetadata global_ptr = { NULL, NULL, NULL, NULL, NULL, 0,  0, 0, 0};
+bool do_setup = true;
 
-void _set_up_global_ptr() {
+int alignInitialProgBreak() {
     unsigned long init_sbrk_ptr = (unsigned long)sbrk(0);
     size_t aligned_size = (init_sbrk_ptr%8 == 0 ? 0 : (8-init_sbrk_ptr%8) );
 
-    void* sbrk_ptr = sbrk(sizeof(*global_ptr)+aligned_size);
-    if (sbrk_ptr != (void*)(-1)) {
-        global_ptr = (GlobalMetadata*)((char*)sbrk_ptr + aligned_size);
-        global_ptr->head = NULL;
-        global_ptr->tail = NULL;
-        global_ptr->free_by_size_head = NULL;
-        global_ptr->free_by_size_tail = NULL;
-        global_ptr->mmap_head = NULL;
-        global_ptr->free_blocks = 0;
-        global_ptr->free_bytes = 0;
-        global_ptr->allocated_blocks = 0;
-        global_ptr->allocated_bytes = 0;
+    void* sbrk_ptr = sbrk(aligned_size);
+    if (sbrk_ptr == (void*)(-1)) {
+        return -1;
     }
+
+    return 1;
 }
 
 /*------------------helper functions--------------*/
@@ -73,10 +66,10 @@ void updateMetaData(MallocMetadata* meta, block_status stat, size_t new_size, bo
 }
 
 void updateStats(long free_blocks, long free_bytes, long allocated_blocks, long allocated_bytes) {
-    global_ptr->free_blocks += free_blocks;
-    global_ptr->free_bytes += free_bytes;
-    global_ptr->allocated_blocks += allocated_blocks;
-    global_ptr->allocated_bytes += allocated_bytes;
+    global_ptr.free_blocks += free_blocks;
+    global_ptr.free_bytes += free_bytes;
+    global_ptr.allocated_blocks += allocated_blocks;
+    global_ptr.allocated_bytes += allocated_bytes;
 }
 
 void removeFromSizeFreeList(MallocMetadata* meta)
@@ -86,24 +79,24 @@ void removeFromSizeFreeList(MallocMetadata* meta)
     if (prev != NULL) {
         prev->free_by_size_next = next;
     } else {
-        global_ptr->free_by_size_head = next;
+        global_ptr.free_by_size_head = next;
     }
 
     if (next != NULL) {
         next->free_by_size_prev = prev;
     } else {
-        global_ptr->free_by_size_tail = prev;
+        global_ptr.free_by_size_tail = prev;
     }
 }
 
 MallocMetadata* findBestFit(size_t size)
 {
     /*finds smallest large enough block*/
-    if (global_ptr->free_by_size_tail == NULL || global_ptr->free_by_size_tail->block_size < size) {
+    if (global_ptr.free_by_size_tail == NULL || global_ptr.free_by_size_tail->block_size < size) {
         return NULL;
     }
 
-    MallocMetadata* curr = global_ptr->free_by_size_head;
+    MallocMetadata* curr = global_ptr.free_by_size_head;
     while (curr != NULL && size > curr->block_size) {
         curr = curr->free_by_size_next;
     }
@@ -114,17 +107,17 @@ MallocMetadata* findBestFit(size_t size)
 void appendToMemoryList(MallocMetadata* meta)
 {
     /*just insert, no stats needed */
-    MallocMetadata* curr_tail = global_ptr->tail;
+    MallocMetadata* curr_tail = global_ptr.tail;
     if (curr_tail != NULL) {
         curr_tail->next = meta;
         meta->prev = curr_tail;
     } else {
         meta->prev = NULL;
-        global_ptr->head = meta;
+        global_ptr.head = meta;
     }
 
     meta->next = NULL;
-    global_ptr->tail = meta;
+    global_ptr.tail = meta;
 }
 /* Return true if a < b
  * Both assumed to be not NULL */
@@ -135,26 +128,26 @@ bool isLowerInFreeList(MallocMetadata* a, MallocMetadata* b) {
 void insertToSizeFreeList(MallocMetadata* meta)
 {
     /*just insert, no stats needed */
-    if (global_ptr->free_by_size_tail == NULL) {
-        global_ptr->free_by_size_head = meta;
-        global_ptr->free_by_size_tail = meta;
+    if (global_ptr.free_by_size_tail == NULL) {
+        global_ptr.free_by_size_head = meta;
+        global_ptr.free_by_size_tail = meta;
         meta->free_by_size_prev = NULL;
         meta->free_by_size_next = NULL;
         return;
-    } else if (isLowerInFreeList(global_ptr->free_by_size_tail, meta)) {
-        global_ptr->free_by_size_tail->free_by_size_next = meta;
-        meta->free_by_size_prev = global_ptr->free_by_size_tail;
+    } else if (isLowerInFreeList(global_ptr.free_by_size_tail, meta)) {
+        global_ptr.free_by_size_tail->free_by_size_next = meta;
+        meta->free_by_size_prev = global_ptr.free_by_size_tail;
         meta->free_by_size_next = NULL;
-        global_ptr->free_by_size_tail = meta;
+        global_ptr.free_by_size_tail = meta;
         return;
     }
 
     /* If we got here the list should be non-empty
      * And meta will never be inserted at the tail */
-    assert(global_ptr->free_by_size_head != NULL);
+    assert(global_ptr.free_by_size_head != NULL);
 
     /* After break meta should be inserted BEFORE curr */
-    MallocMetadata* curr = global_ptr->free_by_size_head;
+    MallocMetadata* curr = global_ptr.free_by_size_head;
     while (curr->free_by_size_next != NULL) {
         if (isLowerInFreeList(meta, curr)) {
             break;
@@ -168,7 +161,7 @@ void insertToSizeFreeList(MallocMetadata* meta)
     meta->free_by_size_next = curr;
 
     if (curr->free_by_size_prev == NULL) {
-        global_ptr->free_by_size_head = meta;
+        global_ptr.free_by_size_head = meta;
     } else {
         curr->free_by_size_prev->free_by_size_next = meta;
     }
@@ -186,7 +179,7 @@ void mergeWithUpper(MallocMetadata* block, block_status status) {
     if (upper->next != NULL) {
         upper->next->prev = block;
     } else {
-        global_ptr->tail = block;
+        global_ptr.tail = block;
     }
 
     updateMetaData(block, status, block->block_size + sizeof(MallocMetadata) + upper->block_size);
@@ -202,7 +195,7 @@ void mergeWithLower(MallocMetadata* block, block_status status) {
     if (block->next != NULL) {
         block->next->prev = lower;
     } else {
-        global_ptr->tail = lower;
+        global_ptr.tail = lower;
     }
 
     updateMetaData(lower, status, block->block_size + sizeof(MallocMetadata) + lower->block_size);
@@ -221,7 +214,7 @@ void splitBlock(MallocMetadata* block_to_split, size_t new_size)
     other_part->next = block_to_split->next;
     other_part->prev = block_to_split;
     if (block_to_split->next == NULL) {
-        global_ptr->tail = other_part;
+        global_ptr.tail = other_part;
     } else {
         block_to_split->next->prev = other_part;
     }
@@ -284,7 +277,7 @@ MallocMetadata* tryToReuseOrMerge(MallocMetadata* block, size_t size)
             block = block->prev;
             updateStats(-1, -(prev_size), -1, sizeof(MallocMetadata));
             return block;
-        } else if (block == global_ptr->tail) {
+        } else if (block == global_ptr.tail) {
             /* current block is wilderness */
             void* prev_prog_break = sbrk((intptr_t)(diff));
             if (prev_prog_break == (void*)(-1)) {
@@ -299,7 +292,7 @@ MallocMetadata* tryToReuseOrMerge(MallocMetadata* block, size_t size)
     }
 
     /* c */
-    if (block == global_ptr->tail) {
+    if (block == global_ptr.tail) {
         size_t diff = size - block->block_size;
         void* prev_prog_break = sbrk((intptr_t)(diff));
         if (prev_prog_break == (void*)(-1)) {
@@ -327,7 +320,7 @@ MallocMetadata* tryToReuseOrMerge(MallocMetadata* block, size_t size)
     }
 
     /* f */
-    if (next_free && block->next == global_ptr->tail) {
+    if (next_free && block->next == global_ptr.tail) {
         if (prev_free) {
             size_t merged_size = prev_size + next_size + block->block_size + 2 * sizeof(MallocMetadata);
             size_t diff = size - merged_size;
@@ -367,13 +360,13 @@ MallocMetadata* tryToReuseOrMerge(MallocMetadata* block, size_t size)
 void prependToMmapList(MallocMetadata* block)
 {
     /*just insert, no stats needed */
-    block->next = global_ptr->mmap_head;
+    block->next = global_ptr.mmap_head;
     block->prev = NULL;
-    if (global_ptr->mmap_head != NULL) {
-        global_ptr->mmap_head->prev = block;
+    if (global_ptr.mmap_head != NULL) {
+        global_ptr.mmap_head->prev = block;
     }
 
-    global_ptr->mmap_head = block;
+    global_ptr.mmap_head = block;
 }
 
 void removeFromMmapList(MallocMetadata* meta)
@@ -383,7 +376,7 @@ void removeFromMmapList(MallocMetadata* meta)
     if (prev != NULL) {
         prev->next = next;
     } else {
-        global_ptr->mmap_head = next;
+        global_ptr.mmap_head = next;
     }
 
     if (next != NULL) {
@@ -401,11 +394,11 @@ void* smalloc(size_t size) {
         return NULL;
     }
 
-    if (global_ptr == NULL) {
-        _set_up_global_ptr();
-        if (global_ptr == NULL) {
+    if (do_setup) {
+        if (-1 == alignInitialProgBreak()) {
             return NULL;
         }
+        do_setup = false;
     }
 
     MallocMetadata* place = findBestFit(aligned_size);
@@ -427,19 +420,19 @@ void* smalloc(size_t size) {
             return META_TO_DATA_PTR(new_region);
         }
 
-        if(global_ptr->tail != NULL && global_ptr->tail->status == FREE)
+        if(global_ptr.tail != NULL && global_ptr.tail->status == FREE)
         { //wilderness block is free but not big enough, so will enlarge it
-            long diff = (long)(aligned_size - global_ptr->tail->block_size);
+            long diff = (long)(aligned_size - global_ptr.tail->block_size);
             MallocMetadata* curr = (MallocMetadata*)sbrk((intptr_t)(diff));
             if ((void*)curr == (void*)(-1)) {
                 return NULL;
             }
 
-            updateStats(-1, -(long)(global_ptr->tail->block_size), 0, diff);
-            updateMetaData(global_ptr->tail, OCCUPIED, global_ptr->tail->block_size + diff); //will change status to the given one and update free stats
-            removeFromSizeFreeList(global_ptr->tail);
+            updateStats(-1, -(long)(global_ptr.tail->block_size), 0, diff);
+            updateMetaData(global_ptr.tail, OCCUPIED, global_ptr.tail->block_size + diff); //will change status to the given one and update free stats
+            removeFromSizeFreeList(global_ptr.tail);
 
-            return META_TO_DATA_PTR(global_ptr->tail);
+            return META_TO_DATA_PTR(global_ptr.tail);
         }
 
         MallocMetadata* new_block = (MallocMetadata*)sbrk((intptr_t)(aligned_size + sizeof(MallocMetadata)));
@@ -584,23 +577,23 @@ void* srealloc(void* oldp, size_t size) {
 }
 
 size_t _num_free_blocks() {
-    return global_ptr->free_blocks;
+    return global_ptr.free_blocks;
 }
 
 size_t _num_free_bytes() {
-    return global_ptr->free_bytes;
+    return global_ptr.free_bytes;
 }
 
 size_t _num_allocated_blocks() {
-    return global_ptr->allocated_blocks;
+    return global_ptr.allocated_blocks;
 }
 
 size_t _num_allocated_bytes() {
-    return global_ptr->allocated_bytes;
+    return global_ptr.allocated_bytes;
 }
 
 size_t _num_meta_data_bytes() {
-    return (global_ptr->allocated_blocks * sizeof(MallocMetadata));
+    return (global_ptr.allocated_blocks * sizeof(MallocMetadata));
 }
 size_t _size_meta_data() {
     return sizeof(MallocMetadata);
