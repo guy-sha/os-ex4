@@ -407,7 +407,7 @@ void* smalloc(size_t size) {
 
     /*------------------no place in the list-------------------------*/
     if (place == NULL){ 
-        if(aligned_size + sizeof(MallocMetadata) >= MMAP_THRESHOLD)
+        if(aligned_size >= MMAP_THRESHOLD)
         {
             MallocMetadata* new_region = (MallocMetadata*)mmap(NULL, aligned_size + sizeof(MallocMetadata), 
                                                                 PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
